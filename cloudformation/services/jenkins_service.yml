@@ -1,0 +1,185 @@
+---
+Description:
+  Jenkins service
+
+Parameters:
+
+  VPC:
+    Description: VPC en la cual desplegar el servicio
+    Type: AWS::EC2::VPC::Id
+
+  Cluster:
+    Description: En que cluster debe correr este servicio
+    Type: String
+
+  JenkinsMasterImage:
+    Description: Imagen de docker a ejecutar
+    Type: String
+
+  JenkinsSlaveImage:
+    Description: Imagen de docker a ejecutar
+    Type: String
+
+  AppImage:
+    Description: Imagen de docker a ejecutar
+    Type: String
+
+  DesiredCount:
+    Description: Cuantas instancias del servicio deberian haber en el cluster
+    Type: Number
+    Default: 1
+
+  Listener:
+    Description: Listener a usar
+    Type: String
+
+  Path:
+    Description: Ruta para registrar en el LoadBalancer
+    Type: String
+    Default: /*
+
+Resources:
+
+  jenkinsService:
+    Type: "AWS::ECS::Service"
+    Properties:
+      Cluster: !Ref Cluster
+      Role: !Ref ServiceRole
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref jenkinsTaskDefinition
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      LoadBalancers:
+        - ContainerName: "jenkins-service"
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+
+  jenkinsTaskDefinition:
+    Type: "AWS::ECS::TaskDefinition"
+    Properties:
+      TaskRoleArn: !Ref Taskrole
+      ContainerDefinitions:
+        - Name: jenkins-service
+          Essential: true
+          Image: !Ref JenkinsMasterImage
+          Environment:
+            - Name: ECS_CLUSTER_ARN
+              Value: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${Cluster}
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: SLAVE_IMAGE
+              Value: !Ref JenkinsSlaveImage
+            - Name: APP_IMAGE
+              Value: !Ref AppImage
+          Memory: 1000
+          PortMappings:
+            - ContainerPort: 8080
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AWS::StackName
+              awslogs-region: !Ref AWS::Region
+
+  CloudWatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Ref AWS::StackName
+      RetentionInDays: 1
+
+  TargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      VpcId: !Ref VPC
+      Port: 8080
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /robots.txt
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+
+  ListenerRule:
+    Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
+    Properties:
+      ListenerArn: !Ref Listener
+      Priority: 3
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - !Ref Path
+      Actions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+
+  ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ecs-service-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Service": [ "ecs.amazonaws.com" ]},
+            "Action": [ "sts:AssumeRole" ]
+          }]
+        }
+      Policies:
+        - PolicyName: !Sub ecs-service-${AWS::StackName}
+          PolicyDocument: |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:Describe*",
+                    "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                    "elasticloadbalancing:DeregisterTargets",
+                    "elasticloadbalancing:Describe*",
+                    "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                    "elasticloadbalancing:RegisterTargets"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+
+  Taskrole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub jenkins-task-role-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      Policies:
+        - PolicyName: !Sub ecs-service-${AWS::StackName}
+          PolicyDocument: |
+            {
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                  "ecr:*",
+                  "ecs:*"
+                ],
+                "Resource": "*"
+              }]
+            }

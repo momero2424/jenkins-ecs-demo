@@ -1,0 +1,63 @@
+---
+Description:
+  Demo LoadBalancer
+
+Parameters:
+
+  EnvironmentName:
+    Description: Nombre del ambiente
+    Type: String
+
+  VPC:
+    Description: VPC en la cual desplegar el balanceador de carga
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Description: En que subnets desplegar el balanceador de carga
+    Type: List<AWS::EC2::Subnet::Id>
+
+  SecurityGroup:
+    Description: Grupo de seguridad para el balanceador de carga
+    Type: AWS::EC2::SecurityGroup::Id
+
+Resources:
+
+  demoLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: !Ref EnvironmentName
+      Subnets: !Ref Subnets
+      SecurityGroups:
+        - !Ref SecurityGroup
+
+  demoListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      LoadBalancerArn: !Ref demoLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref demoTargetGroup
+
+  demoTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      Name: !Sub ${EnvironmentName}-Default
+      VpcId: !Ref VPC
+      Port: 8080
+      Protocol: HTTP
+
+Outputs:
+
+  LoadBalancer:
+    Description: Referencia al balanceador de carga
+    Value: !Ref demoLoadBalancer
+
+  LoadBalancerUrl:
+    Description: URL del balaceandor de carga
+    Value: !GetAtt demoLoadBalancer.DNSName
+
+  Listener:
+    Description: Referencia al listener
+    Value: !Ref demoListener

@@ -1,0 +1,57 @@
+---
+Description:
+  Demo Security Groups
+
+Parameters:
+
+  EnvironmentName:
+    Description: El nombre del ambiente
+    Type: String
+
+  VPC:
+    Description: VPC en la cual desplegar los Security Groups
+    Type: "AWS::EC2::VPC::Id"
+
+Resources:
+
+  ContainersSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Security group for the ECS cluster
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+          IpProtocol: -1
+      Tags:
+        - Key: name
+          Value: !Sub ${EnvironmentName} ECS security group
+
+  LoadBalancerSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Security group for the Load Balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      Tags:
+        - Key: name
+          Value: !Sub ${EnvironmentName} LB security group
+
+  ContainerCommunicationRule:
+    DependsOn: ContainersSecurityGroup
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties:
+      GroupId: !Ref ContainersSecurityGroup
+      SourceSecurityGroupId: !Ref ContainersSecurityGroup
+      IpProtocol: -1
+
+Outputs:
+
+  ContainersSecurityGroup:
+    Description: Security Group para el cluster de ECS
+    Value: !Ref ContainersSecurityGroup
+
+  LoadBalancerSecurityGroup:
+    Description: Security group para el balanceado de carga
+    Value: !Ref LoadBalancerSecurityGroup

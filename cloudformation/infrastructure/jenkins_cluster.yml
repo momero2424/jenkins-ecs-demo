@@ -1,0 +1,276 @@
+---
+Description:
+  Jenkins ECS cluster
+
+Parameters:
+
+  EnvironmentName:
+    Description: Nombre del ambiente
+    Type: String
+
+  InstanceType:
+    Description: Tipo de instancia para usar en el cluster
+    Type: String
+    Default: t2.micro
+
+  VPC:
+    Description: En que VPC desplegar este cluster
+    Type: AWS::EC2::VPC::Id
+
+  Subnets:
+    Description: EN que subnets desplegar este cluster
+    Type: List<AWS::EC2::Subnet::Id>
+
+  SecurityGroup:
+    Description: Grupo de seguridad para los hosts del cluster
+    Type: AWS::EC2::SecurityGroup::Id
+
+  KeyName:
+    Description: Llave de acceso a los hosts
+    Type: AWS::EC2::KeyPair::KeyName
+
+  MinSize:
+    Type: Number
+    Default: '1'
+    Description: Numero minimo de instancias en el AutoScalingGroup
+
+  MaxSize:
+    Type: Number
+    Default: '2'
+    Description: Numero maximo de instancias en el AutoScalingGroup
+
+  Desired:
+    Type: Number
+    Default: '1'
+    Description: Numero deseado de instancias en el AutoScalingGroup
+
+Mappings:
+
+  AWSRegionToAMI:
+    us-east-1:
+      AMI: ami-40286957
+    us-west-1:
+      AMI: ami-70632110
+    us-west-2:
+      AMI: ami-2d1bce4d
+    eu-west-1:
+      AMI: ami-078df974
+    eu-central-1:
+      AMI: ami-d3cf3ebc
+    ap-northeast-1:
+      AMI: ami-2b6ba64a
+    ap-southeast-1:
+      AMI: ami-55598036
+    ap-southeast-2:
+      AMI: ami-0e20176d
+
+Resources:
+
+  jenkinsCluster:
+    Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: !Sub ${EnvironmentName}-jenkinsCluster
+
+  jenkinsAutoScalingGroup:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    Properties:
+      VPCZoneIdentifier: !Ref Subnets
+      LaunchConfigurationName: !Ref jenkinsLaunchConfiguration
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref Desired
+      TerminationPolicies:
+        - Default
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} jenkins host
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT5M
+        WaitOnResourceSignals: true
+
+  scaleUpPolicy:
+    Type: "AWS::AutoScaling::ScalingPolicy"
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref jenkinsAutoScalingGroup
+      EstimatedInstanceWarmup: 300
+      MetricAggregationType: Average
+      PolicyType: StepScaling
+      StepAdjustments:
+        - MetricIntervalLowerBound: "0"
+          MetricIntervalUpperBound: "15"
+          ScalingAdjustment: "1"
+        - MetricIntervalLowerBound: "15"
+          ScalingAdjustment: "2"
+
+  scaleDownPolicy:
+    Type: "AWS::AutoScaling::ScalingPolicy"
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref jenkinsAutoScalingGroup
+      EstimatedInstanceWarmup: 300
+      MetricAggregationType: Average
+      PolicyType: StepScaling
+      StepAdjustments:
+        - MetricIntervalUpperBound: "0"
+          ScalingAdjustment: "-1"
+
+  scaleUpAlarm:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref scaleUpPolicy
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: "1"
+      MetricName: MemoryReservation
+      Namespace: AWS/ECS
+      Period: "60"
+      Statistic: Average
+      Threshold: "90"
+      Unit: Percent
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref jenkinsCluster
+
+  scaleDownAlarm:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref scaleDownPolicy
+      ComparisonOperator: LessThanOrEqualToThreshold
+      EvaluationPeriods: "3"
+      MetricName: MemoryReservation
+      Namespace: AWS/ECS
+      Period: "60"
+      Statistic: Average
+      Threshold: "45"
+      Unit: Percent
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref jenkinsCluster
+
+  jenkinsLaunchConfiguration:
+    Type: "AWS::AutoScaling::LaunchConfiguration"
+    Properties:
+      ImageId: !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref SecurityGroup
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: "50"
+            VolumeType: "gp2"
+        - DeviceName: "/dev/xvdcy"
+          Ebs:
+            VolumeSize: "50"
+            VolumeType: "gp2"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install -y python-pip
+          pip-2.6 install awscli
+          yum install -y aws-cfn-bootstrap
+          vgextend docker /dev/xvdcy
+          lvextend -L+100G /dev/docker/docker-pool
+          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource jenkinsLaunchConfiguration
+          /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource jenkinsAutoScalingGroup
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            "/etc/cfn/cfn-hup.conf":
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource jenkinsLaunchConfiguration
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${jenkinsCluster} >> /etc/ecs/ecs.config
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${EnvironmentName}-ECSRole-${AWS::Region}-jenkins
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Action": "sts:AssumeRole",
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ec2.amazonaws.com"
+            }
+          }]
+        }
+      Policies:
+        - PolicyName: ecs-service
+          PolicyDocument: |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecs:CreateCluster",
+                    "ecs:DeregisterContainerInstance",
+                    "ecs:DiscoverPollEndpoint",
+                    "ecs:Poll",
+                    "ecs:RegisterContainerInstance",
+                    "ecs:StartTelemetrySession",
+                    "ecs:Submit*",
+                    "ecr:GetAuthorizationToken",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref ECSRole
+
+Outputs:
+
+  jenkinsCluster:
+    Description: Referencia al cluster que fue creado
+    Value: !Ref jenkinsCluster

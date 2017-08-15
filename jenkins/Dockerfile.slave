@@ -1,0 +1,30 @@
+FROM jenkinsci/jnlp-slave
+
+# GID currently in use by AWS EC2 Container Service
+ENV DOCKER_VERSION=1.11.2 \
+    DOCKER_GID=497
+
+USER root
+
+# Install utilities
+RUN apt-get update &&\
+    apt-get install -y python-pip git &&\
+    apt-get clean
+
+# Install docker
+RUN curl -fSL "https://get.docker.com/builds/Linux/x86_64/docker-$DOCKER_VERSION.tgz" -o /tmp/docker.tgz &&\
+    mkdir -p /opt/docker-$DOCKER_VERSION/ &&\
+    tar -C /opt/docker-$DOCKER_VERSION/ -xvf /tmp/docker.tgz --strip=1 &&\
+    rm /tmp/docker.tgz &&\
+    ln -s /opt/docker-$DOCKER_VERSION/ /opt/docker &&\
+    ln -s /opt/docker/docker /usr/local/bin/docker &&\
+    groupadd -g ${DOCKER_GID} docker &&\
+    usermod -G docker jenkins
+
+# Install pip packages
+RUN pip install awscli
+
+# Add entrypoint to protect from autoscaling
+COPY slave-entrypoint.sh /usr/local/bin/slave-entrypoint.sh
+RUN chmod +x /usr/local/bin/slave-entrypoint.sh
+ENTRYPOINT [ "slave-entrypoint.sh" ]
