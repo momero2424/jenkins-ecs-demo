@@ -20,7 +20,7 @@ freeStyleJob('deploy') {
     	echo $TASK_NAME
     	CONTAINER_DEFINITIONS=$(aws ecs describe-task-definition --task-definition $TASK_NAME --region  ${AWS_REGION} | jq ".taskDefinition.containerDefinitions | map( .image = (.image | split(\\":\\"))[0] + \\":\\" + \\"${TAG}\\")")
     	VOLUMES=$(aws ecs describe-task-definition --task-definition $TASK_NAME --region  ${AWS_REGION} | jq ".taskDefinition.volumes")
-      TASK_ARN=$(aws ecs register-task-definition --task-role-arn $TASKROLE --region ${AWS_REGION} --family $TASK_NAME --container-definitions "$CONTAINER_DEFINITIONS" --volumes "$VOLUMES" | jq ".taskDefinition.taskDefinitionArn")
+      TASK_ARN=$(aws ecs register-task-definition --region ${AWS_REGION} --family $TASK_NAME --container-definitions "$CONTAINER_DEFINITIONS" --volumes "$VOLUMES" | jq ".taskDefinition.taskDefinitionArn")
       TASK_ARN=$(echo $TASK_ARN | tr -d \\")
     	aws ecs update-service --region  ${AWS_REGION} --cluster ${CLUSTER_NAME} --service $SERVICE --task-definition $TASK_ARN
     done
