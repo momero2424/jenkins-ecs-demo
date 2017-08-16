@@ -28,4 +28,14 @@ node ('jenkins-ecs') {
     sh "docker tag ${APP_IMAGE}:CI${BUILD_NUMBER} ${APP_IMAGE}:CI${BUILD_NUMBER}"
     sh "docker push ${APP_IMAGE}:CI${BUILD_NUMBER}"
   }
+
+  stage('Deploy stage'){
+    def userInput = input(
+             id: 'userInput', message: 'Let\'s Deploy?', parameters: [
+             [$class: 'BooleanParameterDefinition', defaultValue: true, description: 'Deploy to to STAGE?', name: 'UAT']
+            ]);
+    if(userInput==true){
+      build job: 'deploy', parameters: [string(name: 'TAG', value: "CI${BUILD_NUMBER}")]
+    }
+  }
 }
