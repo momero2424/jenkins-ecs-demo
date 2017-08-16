@@ -40,8 +40,8 @@ Resources:
       DesiredCount: !Ref DesiredCount
       TaskDefinition: !Ref AppTaskDefinition
       DeploymentConfiguration:
-        MaximumPercent: 100
-        MinimumHealthyPercent: 0
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
       LoadBalancers:
         - ContainerName: "app-service"
           ContainerPort: 80
