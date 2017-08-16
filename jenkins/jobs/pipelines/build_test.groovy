@@ -32,7 +32,7 @@ node ('jenkins-ecs') {
   stage('Deploy stage'){
     def userInput = input(
              id: 'userInput', message: 'Let\'s Deploy?', parameters: [
-             [$class: 'BooleanParameterDefinition', defaultValue: true, description: 'Deploy to to STAGE?', name: 'UAT']
+             [$class: 'BooleanParameterDefinition', defaultValue: true, description: 'Deploy to to STAGE?', name: 'STAGE']
             ]);
     if(userInput==true){
       build job: 'deploy', parameters: [string(name: 'TAG', value: "CI${BUILD_NUMBER}")]
