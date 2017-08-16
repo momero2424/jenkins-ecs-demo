@@ -1,6 +1,5 @@
 import jenkins.model.*
 import org.jenkinsci.plugins.scriptsecurity.scripts.ScriptApproval
-import org.jenkinsci.plugins.scriptsecurity.scripts.ApprovalContext
 import org.jenkinsci.plugins.scriptsecurity.scripts.languages.GroovyLanguage
 
 def jobName = "seed-job"
@@ -89,7 +88,6 @@ def configXml = """\
 
 def language = GroovyLanguage.get()
 def scriptApproval = ScriptApproval.get()
-def approvalContext = ApprovalContext.create()
 
 def scriptsToApprove = [
   'jobs/build_test_trigger.groovy',

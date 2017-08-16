@@ -1,6 +1,6 @@
 ---
 Description:
-  Demo LoadBalancer
+  LoadBalancer
 
 Parameters:
 
@@ -22,7 +22,7 @@ Parameters:
 
 Resources:
 
-  demoLoadBalancer:
+  LoadBalancer:
     Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
     Properties:
       Name: !Ref EnvironmentName
@@ -30,17 +30,17 @@ Resources:
       SecurityGroups:
         - !Ref SecurityGroup
 
-  demoListener:
+  Listener:
     Type: "AWS::ElasticLoadBalancingV2::Listener"
     Properties:
-      LoadBalancerArn: !Ref demoLoadBalancer
+      LoadBalancerArn: !Ref LoadBalancer
       Port: 80
       Protocol: HTTP
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref demoTargetGroup
+          TargetGroupArn: !Ref TargetGroup
 
-  demoTargetGroup:
+  TargetGroup:
     Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
     Properties:
       Name: !Sub ${EnvironmentName}-Default
@@ -52,12 +52,12 @@ Outputs:
 
   LoadBalancer:
     Description: Referencia al balanceador de carga
-    Value: !Ref demoLoadBalancer
+    Value: !Ref LoadBalancer
 
   LoadBalancerUrl:
     Description: URL del balaceandor de carga
-    Value: !GetAtt demoLoadBalancer.DNSName
+    Value: !GetAtt LoadBalancer.DNSName
 
   Listener:
     Description: Referencia al listener
-    Value: !Ref demoListener
+    Value: !Ref Listener

@@ -24,27 +24,27 @@ Parameters:
     Description: Imagen de docker a ejecutar
     Type: String
 
-  vpcCIDR:
+  VpcCIDR:
     Description: Rango de direcciones IP para la VPC
     Type: String
     Default: 10.0.0.0/16
 
-  publicSubnet1CIDR:
+  PublicSubnet1CIDR:
     Description: Rango de direcciones IP para la subnet publica en AZ1
     Type: String
     Default: 10.0.1.0/24
 
-  publicSubnet2CIDR:
+  PublicSubnet2CIDR:
     Description: Rango de direcciones IP para la subnet publica en AZ2
     Type: String
     Default: 10.0.2.0/24
 
-  privateSubnet1CIDR:
+  PrivateSubnet1CIDR:
     Description: Rango de direcciones IP para la subnet privada en AZ1
     Type: String
     Default: 10.0.3.0/24
 
-  privateSubnet2CIDR:
+  PrivateSubnet2CIDR:
     Description: Rango de direcciones IPC para la subnet privada en AZ2
     Type: String
     Default: 10.0.4.0/24
@@ -57,19 +57,19 @@ Resources:
       TemplateURL: !Sub https://s3.amazonaws.com/${BucketName}/infrastructure/vpc.yml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
-        vpcCIDR: !Ref vpcCIDR
-        publicSubnet1CIDR: !Ref publicSubnet1CIDR
-        publicSubnet2CIDR: !Ref publicSubnet2CIDR
-        privateSubnet1CIDR: !Ref privateSubnet1CIDR
-        privateSubnet2CIDR: !Ref privateSubnet2CIDR
+        VpcCIDR: !Ref VpcCIDR
+        PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
+        PublicSubnet2CIDR: !Ref PublicSubnet2CIDR
+        PrivateSubnet1CIDR: !Ref PrivateSubnet1CIDR
+        PrivateSubnet2CIDR: !Ref PrivateSubnet2CIDR
 
-  securityGroups:
+  SecurityGroups:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       TemplateURL: !Sub https://s3.amazonaws.com/${BucketName}/infrastructure/security_groups.yml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
-        VPC: !GetAtt VPC.Outputs.demoVPC
+        VPC: !GetAtt VPC.Outputs.VPC
 
   JenkinsLoadBalancer:
     Type: "AWS::CloudFormation::Stack"
@@ -77,9 +77,9 @@ Resources:
       TemplateURL: !Sub https://s3.amazonaws.com/${BucketName}/infrastructure/load_balancers.yml
       Parameters:
         EnvironmentName: !Sub Jenkins-${AWS::StackName}
-        VPC: !GetAtt VPC.Outputs.demoVPC
+        VPC: !GetAtt VPC.Outputs.VPC
         Subnets: !GetAtt VPC.Outputs.PublicSubnets
-        SecurityGroup: !GetAtt securityGroups.Outputs.LoadBalancerSecurityGroup
+        SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
 
   AppLoadBalancer:
     Type: "AWS::CloudFormation::Stack"
@@ -87,9 +87,9 @@ Resources:
       TemplateURL: !Sub https://s3.amazonaws.com/${BucketName}/infrastructure/load_balancers.yml
       Parameters:
         EnvironmentName: !Sub App-${AWS::StackName}
-        VPC: !GetAtt VPC.Outputs.demoVPC
+        VPC: !GetAtt VPC.Outputs.VPC
         Subnets: !GetAtt VPC.Outputs.PublicSubnets
-        SecurityGroup: !GetAtt securityGroups.Outputs.LoadBalancerSecurityGroup
+        SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
 
   JenkinsCluster:
     Type: "AWS::CloudFormation::Stack"
@@ -98,9 +98,9 @@ Resources:
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         InstanceType: t2.medium
-        VPC: !GetAtt VPC.Outputs.demoVPC
+        VPC: !GetAtt VPC.Outputs.VPC
         Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-        SecurityGroup: !GetAtt securityGroups.Outputs.ContainersSecurityGroup
+        SecurityGroup: !GetAtt SecurityGroups.Outputs.ContainersSecurityGroup
         KeyName: !Ref KeyName
         MinSize: 1
         MaxSize: 2
@@ -111,8 +111,8 @@ Resources:
     Properties:
       TemplateURL: !Sub https://s3.amazonaws.com/${BucketName}/services/jenkins_service.yml
       Parameters:
-        VPC: !GetAtt VPC.Outputs.demoVPC
-        Cluster: !GetAtt JenkinsCluster.Outputs.jenkinsCluster
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt JenkinsCluster.Outputs.JenkinsCluster
         JenkinsMasterImage: !Ref JenkinsMasterImage
         JenkinsSlaveImage: !Ref JenkinsSlaveImage
         AppImage: !Ref AppImage
@@ -127,9 +127,9 @@ Resources:
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         InstanceType: t2.medium
-        VPC: !GetAtt VPC.Outputs.demoVPC
+        VPC: !GetAtt VPC.Outputs.VPC
         Subnets: !GetAtt VPC.Outputs.PrivateSubnets
-        SecurityGroup: !GetAtt securityGroups.Outputs.ContainersSecurityGroup
+        SecurityGroup: !GetAtt SecurityGroups.Outputs.ContainersSecurityGroup
         KeyName: !Ref KeyName
         MinSize: 1
         MaxSize: 3
@@ -140,19 +140,27 @@ Resources:
     Properties:
       TemplateURL: !Sub https://s3.amazonaws.com/${BucketName}/services/app_service.yml
       Parameters:
-        VPC: !GetAtt VPC.Outputs.demoVPC
-        Cluster: !GetAtt AppCluster.Outputs.appCluster
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt AppCluster.Outputs.AppCluster
         Image: !Ref AppImage
         DesiredCount: 3
         Listener: !GetAtt AppLoadBalancer.Outputs.Listener
         Path: /*
 
-# Outputs:
-#
-#   appCluster:
-#     Description: Referencia al cluster de App
-#     Value: !GetAtt AppCluster.Outputs.appCluster
-#
-#   appService:
-#     Description: Referencia al servicio de App
-#     Value: !GetAtt AppService.Outputs.appService
+Outputs:
+
+  AppCluster:
+    Description: Referencia al cluster de App
+    Value: !GetAtt AppCluster.Outputs.AppCluster
+
+  AppService:
+    Description: Referencia al servicio de App
+    Value: !GetAtt AppService.Outputs.AppService
+
+  AppLoadBalancerUrl:
+    Description: Referencia al servicio de App
+    Value: !GetAtt AppLoadBalancer.Outputs.LoadBalancerUrl
+
+  JenkinsLoadBalancerUrl:
+    Description: Referencia al servicio de Jenkins
+    Value: !GetAtt JenkinsLoadBalancer.Outputs.LoadBalancerUrl

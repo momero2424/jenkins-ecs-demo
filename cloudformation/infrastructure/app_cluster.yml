@@ -31,17 +31,17 @@ Parameters:
 
   MinSize:
     Type: Number
-    Default: '1'
+    Default: 1
     Description: Numero minimo de instancias en el AutoScalingGroup
 
   MaxSize:
     Type: Number
-    Default: '2'
+    Default: 2
     Description: Numero maximo de instancias en el AutoScalingGroup
 
   Desired:
     Type: Number
-    Default: '1'
+    Default: 1
     Description: Numero deseado de instancias en el AutoScalingGroup
 
 Mappings:
@@ -66,16 +66,16 @@ Mappings:
 
 Resources:
 
-  appCluster:
+  AppCluster:
     Type: "AWS::ECS::Cluster"
     Properties:
       ClusterName: !Sub ${EnvironmentName}-appCluster
 
-  appAutoScalingGroup:
+  AppAutoScalingGroup:
     Type: "AWS::AutoScaling::AutoScalingGroup"
     Properties:
       VPCZoneIdentifier: !Ref Subnets
-      LaunchConfigurationName: !Ref appLaunchConfiguration
+      LaunchConfigurationName: !Ref AppLaunchConfiguration
       MinSize: !Ref MinSize
       MaxSize: !Ref MaxSize
       DesiredCapacity: !Ref Desired
@@ -95,11 +95,11 @@ Resources:
         PauseTime: PT5M
         WaitOnResourceSignals: true
 
-  scaleUpPolicy:
+  ScaleUpPolicy:
     Type: "AWS::AutoScaling::ScalingPolicy"
     Properties:
       AdjustmentType: ChangeInCapacity
-      AutoScalingGroupName: !Ref appAutoScalingGroup
+      AutoScalingGroupName: !Ref AppAutoScalingGroup
       EstimatedInstanceWarmup: 300
       MetricAggregationType: Average
       PolicyType: StepScaling
@@ -110,11 +110,11 @@ Resources:
         - MetricIntervalLowerBound: "15"
           ScalingAdjustment: "2"
 
-  scaleDownPolicy:
+  ScaleDownPolicy:
     Type: "AWS::AutoScaling::ScalingPolicy"
     Properties:
       AdjustmentType: ChangeInCapacity
-      AutoScalingGroupName: !Ref appAutoScalingGroup
+      AutoScalingGroupName: !Ref AppAutoScalingGroup
       EstimatedInstanceWarmup: 300
       MetricAggregationType: Average
       PolicyType: StepScaling
@@ -122,12 +122,12 @@ Resources:
         - MetricIntervalUpperBound: "0"
           ScalingAdjustment: "-1"
 
-  scaleUpAlarm:
+  ScaleUpAlarm:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
       ActionsEnabled: true
       AlarmActions:
-        - !Ref scaleUpPolicy
+        - !Ref ScaleUpPolicy
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: "1"
       MetricName: MemoryReservation
@@ -138,14 +138,14 @@ Resources:
       Unit: Percent
       Dimensions:
         - Name: ClusterName
-          Value: !Ref appCluster
+          Value: !Ref AppCluster
 
-  scaleDownAlarm:
+  ScaleDownAlarm:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
       ActionsEnabled: true
       AlarmActions:
-        - !Ref scaleDownPolicy
+        - !Ref ScaleDownPolicy
       ComparisonOperator: LessThanOrEqualToThreshold
       EvaluationPeriods: "3"
       MetricName: MemoryReservation
@@ -156,9 +156,9 @@ Resources:
       Unit: Percent
       Dimensions:
         - Name: ClusterName
-          Value: !Ref appCluster
+          Value: !Ref AppCluster
 
-  appLaunchConfiguration:
+  AppLaunchConfiguration:
     Type: "AWS::AutoScaling::LaunchConfiguration"
     Properties:
       ImageId: !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
@@ -184,8 +184,8 @@ Resources:
           yum install -y aws-cfn-bootstrap
           vgextend docker /dev/xvdcy
           lvextend -L+100G /dev/docker/docker-pool
-          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource appLaunchConfiguration
-          /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource appAutoScalingGroup
+          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource AppLaunchConfiguration
+          /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource AppAutoScalingGroup
     Metadata:
       AWS::CloudFormation::Init:
         config:
@@ -206,10 +206,10 @@ Resources:
                 [cfn-auto-reloader-hook]
                 triggers=post.update
                 path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource appLaunchConfiguration
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource AppLaunchConfiguration
           commands:
             01_add_instance_to_cluster:
-              command: !Sub echo ECS_CLUSTER=${appCluster} >> /etc/ecs/ecs.config
+              command: !Sub echo ECS_CLUSTER=${AppCluster} >> /etc/ecs/ecs.config
           services:
             sysvinit:
               cfn-hup:
@@ -270,6 +270,6 @@ Resources:
 
 Outputs:
 
-  appCluster:
+  AppCluster:
     Description: Referencia al cluster que fue creado
-    Value: !Ref appCluster
+    Value: !Ref AppCluster

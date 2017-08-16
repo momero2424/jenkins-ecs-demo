@@ -66,16 +66,16 @@ Mappings:
 
 Resources:
 
-  jenkinsCluster:
+  JenkinsCluster:
     Type: "AWS::ECS::Cluster"
     Properties:
       ClusterName: !Sub ${EnvironmentName}-jenkinsCluster
 
-  jenkinsAutoScalingGroup:
+  JenkinsAutoScalingGroup:
     Type: "AWS::AutoScaling::AutoScalingGroup"
     Properties:
       VPCZoneIdentifier: !Ref Subnets
-      LaunchConfigurationName: !Ref jenkinsLaunchConfiguration
+      LaunchConfigurationName: !Ref JenkinsLaunchConfiguration
       MinSize: !Ref MinSize
       MaxSize: !Ref MaxSize
       DesiredCapacity: !Ref Desired
@@ -95,11 +95,11 @@ Resources:
         PauseTime: PT5M
         WaitOnResourceSignals: true
 
-  scaleUpPolicy:
+  ScaleUpPolicy:
     Type: "AWS::AutoScaling::ScalingPolicy"
     Properties:
       AdjustmentType: ChangeInCapacity
-      AutoScalingGroupName: !Ref jenkinsAutoScalingGroup
+      AutoScalingGroupName: !Ref JenkinsAutoScalingGroup
       EstimatedInstanceWarmup: 300
       MetricAggregationType: Average
       PolicyType: StepScaling
@@ -110,11 +110,11 @@ Resources:
         - MetricIntervalLowerBound: "15"
           ScalingAdjustment: "2"
 
-  scaleDownPolicy:
+  ScaleDownPolicy:
     Type: "AWS::AutoScaling::ScalingPolicy"
     Properties:
       AdjustmentType: ChangeInCapacity
-      AutoScalingGroupName: !Ref jenkinsAutoScalingGroup
+      AutoScalingGroupName: !Ref JenkinsAutoScalingGroup
       EstimatedInstanceWarmup: 300
       MetricAggregationType: Average
       PolicyType: StepScaling
@@ -122,12 +122,12 @@ Resources:
         - MetricIntervalUpperBound: "0"
           ScalingAdjustment: "-1"
 
-  scaleUpAlarm:
+  ScaleUpAlarm:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
       ActionsEnabled: true
       AlarmActions:
-        - !Ref scaleUpPolicy
+        - !Ref ScaleUpPolicy
       ComparisonOperator: GreaterThanOrEqualToThreshold
       EvaluationPeriods: "1"
       MetricName: MemoryReservation
@@ -138,14 +138,14 @@ Resources:
       Unit: Percent
       Dimensions:
         - Name: ClusterName
-          Value: !Ref jenkinsCluster
+          Value: !Ref JenkinsCluster
 
-  scaleDownAlarm:
+  ScaleDownAlarm:
     Type: "AWS::CloudWatch::Alarm"
     Properties:
       ActionsEnabled: true
       AlarmActions:
-        - !Ref scaleDownPolicy
+        - !Ref ScaleDownPolicy
       ComparisonOperator: LessThanOrEqualToThreshold
       EvaluationPeriods: "3"
       MetricName: MemoryReservation
@@ -156,9 +156,9 @@ Resources:
       Unit: Percent
       Dimensions:
         - Name: ClusterName
-          Value: !Ref jenkinsCluster
+          Value: !Ref JenkinsCluster
 
-  jenkinsLaunchConfiguration:
+  JenkinsLaunchConfiguration:
     Type: "AWS::AutoScaling::LaunchConfiguration"
     Properties:
       ImageId: !FindInMap [AWSRegionToAMI, !Ref "AWS::Region", AMI]
@@ -184,8 +184,8 @@ Resources:
           yum install -y aws-cfn-bootstrap
           vgextend docker /dev/xvdcy
           lvextend -L+100G /dev/docker/docker-pool
-          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource jenkinsLaunchConfiguration
-          /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource jenkinsAutoScalingGroup
+          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource JenkinsLaunchConfiguration
+          /opt/aws/bin/cfn-signal -e 0 --region ${AWS::Region} --stack ${AWS::StackName} --resource JenkinsAutoScalingGroup
     Metadata:
       AWS::CloudFormation::Init:
         config:
@@ -206,10 +206,10 @@ Resources:
                 [cfn-auto-reloader-hook]
                 triggers=post.update
                 path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource jenkinsLaunchConfiguration
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource JenkinsLaunchConfiguration
           commands:
             01_add_instance_to_cluster:
-              command: !Sub echo ECS_CLUSTER=${jenkinsCluster} >> /etc/ecs/ecs.config
+              command: !Sub echo ECS_CLUSTER=${JenkinsCluster} >> /etc/ecs/ecs.config
           services:
             sysvinit:
               cfn-hup:
@@ -271,6 +271,6 @@ Resources:
 
 Outputs:
 
-  jenkinsCluster:
+  JenkinsCluster:
     Description: Referencia al cluster que fue creado
-    Value: !Ref jenkinsCluster
+    Value: !Ref JenkinsCluster

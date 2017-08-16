@@ -11,8 +11,10 @@ node ('jenkins-ecs') {
     def externalPort = 8000 + ((BUILD_NUMBER as Integer) % 1000)
     sh "docker run --detach --publish ${externalPort}:80 --name demo-test-CI${BUILD_NUMBER} ${APP_IMAGE}:CI${BUILD_NUMBER}"
 
+    def instanceIp = sh(returnStdout: true, script: 'curl -s http://169.254.169.254/latest/meta-data/local-ipv4')
+
     try {
-      sh "curl localhost:${externalPort}/app/"
+      sh "curl -s ${instanceIp}:${externalPort}/app/ | grep 'Jenkins ECS demo'"
     } catch (e) {
       throw e
     } finally {
@@ -22,8 +24,8 @@ node ('jenkins-ecs') {
   }
 
   stage('Push image') {
-    sh "$(aws ecr get-login --no-include-email --region ${AWS_REGION})"
-    sh "docker tag demoApp:CI${BUILD_NUMBER} ${APP_IMAGE}:CI${BUILD_NUMBER}"
+    sh "\$(aws ecr get-login --no-include-email --region ${AWS_REGION})"
+    sh "docker tag ${APP_IMAGE}:CI${BUILD_NUMBER} ${APP_IMAGE}:CI${BUILD_NUMBER}"
     sh "docker push ${APP_IMAGE}:CI${BUILD_NUMBER}"
   }
 }

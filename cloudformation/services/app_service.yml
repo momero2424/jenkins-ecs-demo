@@ -32,13 +32,13 @@ Parameters:
 
 Resources:
 
-  appService:
+  AppService:
     Type: "AWS::ECS::Service"
     Properties:
       Cluster: !Ref Cluster
       Role: !Ref ServiceRole
       DesiredCount: !Ref DesiredCount
-      TaskDefinition: !Ref appTaskDefinition
+      TaskDefinition: !Ref AppTaskDefinition
       DeploymentConfiguration:
         MaximumPercent: 100
         MinimumHealthyPercent: 0
@@ -47,7 +47,7 @@ Resources:
           ContainerPort: 80
           TargetGroupArn: !Ref TargetGroup
 
-  appTaskDefinition:
+  AppTaskDefinition:
     Type: "AWS::ECS::TaskDefinition"
     Properties:
       TaskRoleArn: !Ref Taskrole
@@ -168,6 +168,6 @@ Resources:
 
 Outputs:
 
-  appService:
+  AppService:
     Description: Referencia al servicio que fue creado
-    Value: !Ref appService
+    Value: !Ref AppService

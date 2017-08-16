@@ -6,6 +6,8 @@ freeStyleJob('build and test trigger') {
     githubPullRequest {
       cron('* * * * *')
       triggerPhrase('jenkins test this please')
+      useGitHubHooks()
+      admin('momero2424')
     }
   }
   concurrentBuild()

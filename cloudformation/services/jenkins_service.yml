@@ -13,15 +13,15 @@ Parameters:
     Type: String
 
   JenkinsMasterImage:
-    Description: Imagen de docker a ejecutar
+    Description: Imagen de jenkins master a ejecutar
     Type: String
 
   JenkinsSlaveImage:
-    Description: Imagen de docker a ejecutar
+    Description: Imagen de jenkins slave a ejecutar
     Type: String
 
   AppImage:
-    Description: Imagen de docker a ejecutar
+    Description: Imagen de la aplicacion a ejecutar
     Type: String
 
   DesiredCount:
@@ -40,13 +40,13 @@ Parameters:
 
 Resources:
 
-  jenkinsService:
+  JenkinsService:
     Type: "AWS::ECS::Service"
     Properties:
       Cluster: !Ref Cluster
       Role: !Ref ServiceRole
       DesiredCount: !Ref DesiredCount
-      TaskDefinition: !Ref jenkinsTaskDefinition
+      TaskDefinition: !Ref JenkinsTaskDefinition
       DeploymentConfiguration:
         MaximumPercent: 100
         MinimumHealthyPercent: 0
@@ -55,7 +55,7 @@ Resources:
           ContainerPort: 8080
           TargetGroupArn: !Ref TargetGroup
 
-  jenkinsTaskDefinition:
+  JenkinsTaskDefinition:
     Type: "AWS::ECS::TaskDefinition"
     Properties:
       TaskRoleArn: !Ref Taskrole
@@ -72,9 +72,16 @@ Resources:
               Value: !Ref JenkinsSlaveImage
             - Name: APP_IMAGE
               Value: !Ref AppImage
+            - Name: TASKROLE
+              Value: !GetAtt Taskrole.Arn
+            - Name: AWSLOGS_GROUP
+              Value: !Ref AWS::StackName
           Memory: 1000
           PortMappings:
             - ContainerPort: 8080
+              HostPort: 8080
+            - ContainerPort: 50000
+              HostPort: 50000
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -178,7 +185,10 @@ Resources:
                 "Effect": "Allow",
                 "Action": [
                   "ecr:*",
-                  "ecs:*"
+                  "ecs:*",
+                  "iam:PassRole",
+                  "autoscaling:DescribeAutoScalingInstances",
+                  "autoscaling:SetInstanceProtection"
                 ],
                 "Resource": "*"
               }]

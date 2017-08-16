@@ -1,6 +1,6 @@
 ---
 Description:
-  Demo Security Groups
+  Security Groups
 
 Parameters:
 
@@ -17,7 +17,7 @@ Resources:
   ContainersSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
-      GroupDescription: Security group for the ECS cluster
+      GroupDescription: Security group para el cluster de ECS
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
@@ -29,7 +29,7 @@ Resources:
   LoadBalancerSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
-      GroupDescription: Security group for the Load Balancer
+      GroupDescription: Security group para el balanceador de carga
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
